@@ -11270,10 +11270,13 @@ class App extends React.Component<AppProps, AppState> {
           const hitElements = this.getElementsAtPosition(
             scenePointer.x,
             scenePointer.y,
+          ).filter(
+            (hitElement) =>
+              !isPdfPageFrame(hitElement) && !isPdfPageBackground(hitElement),
           );
-          hitElements.forEach((hitElement) =>
-            this.elementsPendingErasure.add(hitElement.id),
-          );
+          hitElements.forEach((hitElement) => {
+            this.elementsPendingErasure.add(hitElement.id);
+          });
         }
         this.eraseElements();
         return;
@@ -11662,6 +11665,10 @@ class App extends React.Component<AppProps, AppState> {
     });
 
     const elements = this.scene.getElementsIncludingDeleted().map((ele) => {
+      if (isPdfPageFrame(ele) || isPdfPageBackground(ele)) {
+        return ele;
+      }
+
       if (
         this.elementsPendingErasure.has(ele.id) ||
         (ele.frameId && this.elementsPendingErasure.has(ele.frameId)) ||

@@ -34,6 +34,7 @@ import type { GlobalPoint, LineSegment } from "@excalidraw/math/types";
 import type { ElementsMap, ExcalidrawElement } from "@excalidraw/element/types";
 
 import { AnimatedTrail } from "../animatedTrail";
+import { isPdfPageBackground, isPdfPageFrame } from "../pdfPageStack";
 
 import type App from "../components/App";
 
@@ -99,7 +100,7 @@ export class EraserTrail extends AnimatedTrail {
     );
 
     const candidateElements = this.app.visibleElements.filter(
-      (el) => !el.locked,
+      (el) => !el.locked && !isPdfPageFrame(el) && !isPdfPageBackground(el),
     );
 
     const candidateElementsMap = arrayToMap(candidateElements);
