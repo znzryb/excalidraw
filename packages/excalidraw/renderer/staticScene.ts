@@ -15,7 +15,6 @@ import {
 import {
   elementOverlapsWithFrame,
   getTargetFrame,
-  shouldApplyFrameClip,
 } from "@excalidraw/element";
 
 import { renderElement } from "@excalidraw/element";
@@ -35,6 +34,7 @@ import {
 } from "../components/hyperlink/helpers";
 import { isPdfPageBackground } from "../pdfPageStack";
 
+import { shouldClipElementToFrame } from "./frameClipping";
 import { bootstrapCanvas, getNormalizedCanvasDimensions } from "./helpers";
 
 import type {
@@ -347,7 +347,7 @@ const _renderStaticScene = ({
           const frame = getTargetFrame(element, elementsMap, appState);
           if (
             frame &&
-            shouldApplyFrameClip(
+            shouldClipElementToFrame(
               element,
               frame,
               appState,
@@ -464,7 +464,7 @@ const _renderStaticScene = ({
 
           if (
             frame &&
-            shouldApplyFrameClip(
+            shouldClipElementToFrame(
               element,
               frame,
               appState,

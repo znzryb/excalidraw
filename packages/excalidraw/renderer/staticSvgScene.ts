@@ -46,6 +46,7 @@ import type { RenderableElementsMap, SVGRenderConfig } from "../scene/types";
 import type { AppState, BinaryFiles } from "../types";
 import type { Drawable } from "roughjs/bin/core";
 import type { RoughSVG } from "roughjs/bin/svg";
+import { isPdfPageFrame } from "../pdfPageStack";
 
 const roughSVGDrawWithPrecision = (
   rsvg: RoughSVG,
@@ -74,7 +75,7 @@ const maybeWrapNodesInFrameClipPath = (
     return null;
   }
   const frame = getContainingFrame(element, elementsMap);
-  if (frame) {
+  if (frame && !isPdfPageFrame(frame)) {
     const g = root.ownerDocument.createElementNS(SVG_NS, "g");
     g.setAttributeNS(SVG_NS, "clip-path", `url(#${frame.id})`);
     nodes.forEach((node) => g.appendChild(node));

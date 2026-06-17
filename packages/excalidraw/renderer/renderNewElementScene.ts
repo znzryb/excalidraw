@@ -4,9 +4,9 @@ import {
   getTargetFrame,
   isInvisiblySmallElement,
   renderElement,
-  shouldApplyFrameClip,
 } from "@excalidraw/element";
 
+import { shouldClipElementToFrame } from "./frameClipping";
 import { bootstrapCanvas, getNormalizedCanvasDimensions } from "./helpers";
 
 import { frameClip } from "./staticScene";
@@ -61,7 +61,7 @@ const _renderNewElementScene = ({
 
         if (
           frame &&
-          shouldApplyFrameClip(newElement, frame, appState, elementsMap)
+          shouldClipElementToFrame(newElement, frame, appState, elementsMap)
         ) {
           frameClip(frame, context, renderConfig, appState);
         }

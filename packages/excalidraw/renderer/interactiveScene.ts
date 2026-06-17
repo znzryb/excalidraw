@@ -89,6 +89,7 @@ import {
 } from "../scene/scrollbars";
 
 import { getClientColor, renderRemoteCursors } from "../clients";
+import { isPdfPageFrame } from "../pdfPageStack";
 import {
   getTextAutoResizeHandle,
   getTextBoxPadding,
@@ -233,7 +234,11 @@ const renderBindingHighlightForBindableElement_simple = (
   const enclosingFrame =
     suggestedBinding.element.frameId &&
     elementsMap.get(suggestedBinding.element.frameId);
-  if (enclosingFrame && isFrameLikeElement(enclosingFrame)) {
+  if (
+    enclosingFrame &&
+    isFrameLikeElement(enclosingFrame) &&
+    !isPdfPageFrame(enclosingFrame)
+  ) {
     context.translate(enclosingFrame.x, enclosingFrame.y);
 
     context.beginPath();
@@ -574,7 +579,11 @@ const renderBindingHighlightForBindableElement_complex = (
   const offset = element.strokeWidth / 2;
 
   const enclosingFrame = element.frameId && allElementsMap.get(element.frameId);
-  if (enclosingFrame && isFrameLikeElement(enclosingFrame)) {
+  if (
+    enclosingFrame &&
+    isFrameLikeElement(enclosingFrame) &&
+    !isPdfPageFrame(enclosingFrame)
+  ) {
     context.translate(enclosingFrame.x, enclosingFrame.y);
 
     context.beginPath();
