@@ -391,7 +391,13 @@ import {
 } from "../data/blob";
 
 import { fileOpen } from "../data/filesystem";
-import { isPdfFile, PDF_MIME_TYPE } from "../pdfPageStack";
+import {
+  getPdfPageFrameForElement,
+  isPdfFile,
+  isPdfPageBackground,
+  isPdfPageFrame,
+  PDF_MIME_TYPE,
+} from "../pdfPageStack";
 import {
   showHyperlinkTooltip,
   hideHyperlinkToolip,
@@ -6045,7 +6051,7 @@ class App extends React.Component<AppProps, AppState> {
 
     const elementsMap = this.scene.getNonDeletedElementsMap();
 
-    const elements = (
+    const elements =
       opts?.includeBoundTextElement && opts?.includeLockedElements
         ? this.scene.getNonDeletedElements()
         : this.scene
@@ -6055,9 +6061,26 @@ class App extends React.Component<AppProps, AppState> {
                 (opts?.includeLockedElements || !element.locked) &&
                 (opts?.includeBoundTextElement ||
                   !(isTextElement(element) && element.containerId)),
-            )
-    )
+            );
+    const hitElementIds = new Set<string>();
+    const elementsAtPosition: NonDeleted<ExcalidrawElement>[] = [];
+
+    elements
       .filter((el) => this.hitElement(x, y, el))
+      .forEach((element) => {
+        const hitElement = isPdfPageBackground(element)
+          ? getPdfPageFrameForElement(element, elements)
+          : element;
+
+        if (!hitElement || hitElementIds.has(hitElement.id)) {
+          return;
+        }
+
+        hitElementIds.add(hitElement.id);
+        elementsAtPosition.push(hitElement);
+      });
+
+    const hitElements = elementsAtPosition
       .filter((element) => {
         // hitting a frame's element from outside the frame is not considered a hit
         const containingFrame = getContainingFrame(element, elementsMap);
@@ -6073,14 +6096,14 @@ class App extends React.Component<AppProps, AppState> {
         // Exception being embeddables which should be on top of everything else in
         // terms of hit testing.
         if (isIframeElement(el)) {
-          iframeLikes.push(el);
+          iframeLikes.push(el as Ordered<ExcalidrawIframeElement>);
           return false;
         }
         return true;
       })
       .concat(iframeLikes) as NonDeleted<ExcalidrawElement>[];
 
-    return elements;
+    return hitElements;
   }
 
   getElementHitThreshold(element: ExcalidrawElement) {
@@ -12089,6 +12112,7 @@ class App extends React.Component<AppProps, AppState> {
         ...this.scene.getElementsIncludingDeleted(),
         ...pdfElements,
       ]);
+      const importedPageFrames = pdfElements.filter(isPdfPageFrame);
 
       this.syncActionResult({
         elements: nextElements,
@@ -12097,7 +12121,7 @@ class App extends React.Component<AppProps, AppState> {
           ...this.state,
           selectedElementIds: makeNextSelectedElementIds(
             Object.fromEntries(
-              pdfElements.map((element) => [element.id, true]),
+              importedPageFrames.map((element) => [element.id, true]),
             ),
             this.state,
           ),

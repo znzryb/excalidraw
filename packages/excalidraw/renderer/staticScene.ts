@@ -33,6 +33,7 @@ import {
   ELEMENT_LINK_IMG,
   getLinkHandleFromCoords,
 } from "../components/hyperlink/helpers";
+import { isPdfPageBackground } from "../pdfPageStack";
 
 import { bootstrapCanvas, getNormalizedCanvasDimensions } from "./helpers";
 
@@ -260,6 +261,29 @@ const _renderStaticScene = ({
   // Apply zoom
   context.scale(appState.zoom.value, appState.zoom.value);
 
+  visibleElements.filter(isPdfPageBackground).forEach((element) => {
+    try {
+      renderElement(
+        element,
+        elementsMap,
+        allElementsMap,
+        rc,
+        context,
+        renderConfig,
+        appState,
+      );
+    } catch (error: any) {
+      console.error(
+        error,
+        element.id,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+      );
+    }
+  });
+
   // Grid
   if (renderGrid) {
     strokeGrid(
@@ -299,7 +323,7 @@ const _renderStaticScene = ({
 
   // Paint visible elements
   visibleElements
-    .filter((el) => !isIframeLikeElement(el))
+    .filter((el) => !isIframeLikeElement(el) && !isPdfPageBackground(el))
     .forEach((element) => {
       try {
         const frameId = element.frameId || appState.frameToHighlight?.id;
