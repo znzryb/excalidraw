@@ -1,51 +1,101 @@
 import { newElement, newFrameElement } from "@excalidraw/element";
 import { vi } from "vitest";
 
-// @ts-expect-error fake-indexeddb v3 ships without TypeScript declarations.
-import FDBFactory from "fake-indexeddb/lib/FDBFactory";
-
-import {
-  PDF_PAGE_DEBUG_CONFIG_KEY,
-  pdfPageDebug,
-} from "../pdfPageDebugLogger";
+import { pdfPageDebug } from "../pdfPageDebugLogger";
 import { PDF_PAGE_GAP, makePdfPageCustomData } from "../pdfPageStack";
 
-const resetIndexedDB = () => {
-  Object.defineProperty(window, "indexedDB", {
-    value: new FDBFactory(),
-    configurable: true,
-  });
+const makeFetchResponse = (body: unknown, ok = true) =>
+  ({
+    ok,
+    json: async () => body,
+  } as Response);
+
+const setDebugEnv = (env: Record<string, string | undefined>) => {
+  const previous = Object.fromEntries(
+    Object.keys(env).map((key) => [key, import.meta.env[key]]),
+  );
+
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) {
+      delete import.meta.env[key];
+    } else {
+      import.meta.env[key] = value;
+    }
+  }
+
+  return () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete import.meta.env[key];
+      } else {
+        import.meta.env[key] = value as string;
+      }
+    }
+  };
 };
 
 describe("pdfPageDebug", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let restoreEnv: () => void;
+
   beforeEach(async () => {
-    localStorage.clear();
-    resetIndexedDB();
+    restoreEnv = setDebugEnv({
+      VITE_AC_PDF_DEBUG: undefined,
+      VITE_AC_PDF_DEBUG_LEVEL: undefined,
+      VITE_AC_PDF_DEBUG_CONSOLE: undefined,
+      VITE_AC_PDF_DEBUG_MAX_ENTRIES: undefined,
+    });
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith("/__ac_pdf_debug/logs")) {
+        return makeFetchResponse([], false);
+      }
+
+      return makeFetchResponse({ ok: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
     vi.restoreAllMocks();
+    pdfPageDebug.disable();
     await pdfPageDebug.clear();
+    fetchMock.mockClear();
   });
 
-  it("does not persist logs while disabled", async () => {
+  afterEach(() => {
+    restoreEnv();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not send logs while disabled", async () => {
     await pdfPageDebug.log("disabled", { value: 1 }, "error");
 
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(await pdfPageDebug.dump()).toEqual([]);
   });
 
-  it("persists logs after enable", async () => {
+  it("sends sanitized logs after enable", async () => {
     pdfPageDebug.enable();
 
     await pdfPageDebug.log("enabled", { value: 1 }, "debug");
-    const entries = await pdfPageDebug.dump();
 
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/__ac_pdf_debug/log",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(String),
+      }),
+    );
+
+    const [, options] = fetchMock.mock.calls[0];
+    const entry = JSON.parse(options.body);
+    expect(entry).toMatchObject({
       level: "debug",
       eventName: "enabled",
       payload: { value: 1 },
+      sequence: expect.any(Number),
     });
-    expect(entries[0].id).toEqual(expect.any(String));
-    expect(entries[0].timestamp).toEqual(expect.any(Number));
-    expect(entries[0].sessionId).toEqual(expect.any(String));
+    expect(entry.id).toEqual(expect.any(String));
+    expect(entry.timestamp).toEqual(expect.any(Number));
+    expect(entry.sessionId).toEqual(expect.any(String));
   });
 
   it("filters writes below the configured level", async () => {
@@ -55,13 +105,47 @@ describe("pdfPageDebug", () => {
     await pdfPageDebug.log("warn-event", { value: 2 }, "warn");
     await pdfPageDebug.log("error-event", { value: 3 }, "error");
 
-    expect((await pdfPageDebug.dump()).map((entry) => entry.eventName)).toEqual([
-      "error-event",
-      "warn-event",
-    ]);
+    const eventNames = fetchMock.mock.calls.map(([, options]) =>
+      JSON.parse(options.body).eventName,
+    );
+    expect(eventNames).toEqual(["warn-event", "error-event"]);
   });
 
-  it("filters dumps by level and event name", async () => {
+  it("lets compile-time env disable runtime enable", async () => {
+    restoreEnv();
+    restoreEnv = setDebugEnv({
+      VITE_AC_PDF_DEBUG: "0",
+      VITE_AC_PDF_DEBUG_LEVEL: undefined,
+      VITE_AC_PDF_DEBUG_CONSOLE: undefined,
+      VITE_AC_PDF_DEBUG_MAX_ENTRIES: undefined,
+    });
+
+    pdfPageDebug.enable();
+    await pdfPageDebug.log("env-disabled", { value: 1 }, "error");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses compile-time env level as the highest-priority level", async () => {
+    restoreEnv();
+    restoreEnv = setDebugEnv({
+      VITE_AC_PDF_DEBUG: "1",
+      VITE_AC_PDF_DEBUG_LEVEL: "error",
+      VITE_AC_PDF_DEBUG_CONSOLE: undefined,
+      VITE_AC_PDF_DEBUG_MAX_ENTRIES: undefined,
+    });
+
+    pdfPageDebug.enable({ level: "trace" });
+    await pdfPageDebug.log("warn-event", { value: 1 }, "warn");
+    await pdfPageDebug.log("error-event", { value: 2 }, "error");
+
+    const eventNames = fetchMock.mock.calls.map(([, options]) =>
+      JSON.parse(options.body).eventName,
+    );
+    expect(eventNames).toEqual(["error-event"]);
+  });
+
+  it("filters memory dumps by level and event name", async () => {
     pdfPageDebug.enable({ level: "trace" });
 
     await pdfPageDebug.log("mapped", { value: 1 }, "trace");
@@ -80,16 +164,20 @@ describe("pdfPageDebug", () => {
     ).toEqual(["trace"]);
   });
 
-  it("clears persisted logs", async () => {
+  it("clears in-memory logs and server logs", async () => {
     pdfPageDebug.enable();
     await pdfPageDebug.log("entry", { value: 1 }, "debug");
+    fetchMock.mockClear();
 
     await pdfPageDebug.clear();
 
     expect(await pdfPageDebug.dump()).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith("/__ac_pdf_debug/logs", {
+      method: "DELETE",
+    });
   });
 
-  it("trims old logs over maxEntries", async () => {
+  it("trims old in-memory logs over maxEntries", async () => {
     pdfPageDebug.enable({ maxEntries: 2 });
 
     await pdfPageDebug.log("one", null, "debug");
@@ -102,7 +190,7 @@ describe("pdfPageDebug", () => {
     ]);
   });
 
-  it("sanitizes elements before persisting payloads", async () => {
+  it("sanitizes elements before sending payloads", async () => {
     pdfPageDebug.enable();
     const pdfPageFrame = newFrameElement({
       x: 0,
@@ -125,8 +213,9 @@ describe("pdfPageDebug", () => {
     };
 
     await pdfPageDebug.log("sanitize", { element: note, frame: pdfPageFrame });
-    const [entry] = await pdfPageDebug.dump();
 
+    const [, options] = fetchMock.mock.calls[0];
+    const entry = JSON.parse(options.body);
     expect(entry.payload).toEqual({
       element: expect.objectContaining({
         id: note.id,
@@ -146,25 +235,7 @@ describe("pdfPageDebug", () => {
         isPdfPageFrame: true,
       }),
     });
-    expect(entry.payload).not.toHaveProperty("element.points");
-    expect(entry.payload).not.toHaveProperty("element.file");
-  });
-
-  it("stores runtime config in localStorage", () => {
-    const config = pdfPageDebug.enable({
-      level: "trace",
-      console: true,
-      maxEntries: 5,
-    });
-
-    expect(config).toMatchObject({
-      enabled: true,
-      level: "trace",
-      console: true,
-      maxEntries: 5,
-    });
-    expect(
-      JSON.parse(localStorage.getItem(PDF_PAGE_DEBUG_CONFIG_KEY)!),
-    ).toMatchObject(config);
+    expect(entry.payload.element).not.toHaveProperty("points");
+    expect(entry.payload.element).not.toHaveProperty("file");
   });
 });

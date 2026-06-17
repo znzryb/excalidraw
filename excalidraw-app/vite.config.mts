@@ -1,5 +1,7 @@
 import path from "path";
+import fs from "fs/promises";
 import { defineConfig, loadEnv } from "vite";
+import type { Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import svgrPlugin from "vite-plugin-svgr";
 import { ViteEjsPlugin } from "vite-plugin-ejs";
@@ -8,6 +10,124 @@ import checker from "vite-plugin-checker";
 import { createHtmlPlugin } from "vite-plugin-html";
 import Sitemap from "vite-plugin-sitemap";
 import { woff2BrowserPlugin } from "../scripts/woff2/woff2-vite-plugins";
+
+const PDF_PAGE_DEBUG_LEVELS = ["trace", "debug", "info", "warn", "error"];
+
+const readRequestBody = async (request: import("http").IncomingMessage) =>
+  new Promise<string>((resolve, reject) => {
+    let body = "";
+
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => resolve(body));
+    request.on("error", reject);
+  });
+
+const createPdfPageDebugPlugin = (): Plugin => {
+  const logDir = path.resolve(__dirname, "../.ac-debug");
+  const logFile = path.join(logDir, "pdf-page-debug.jsonl");
+
+  return {
+    name: "ac-pdf-page-debug",
+    configureServer(server) {
+      server.middlewares.use(async (request, response, next) => {
+        const url = new URL(request.url ?? "/", "http://localhost");
+        if (!url.pathname.startsWith("/__ac_pdf_debug/")) {
+          next();
+          return;
+        }
+
+        response.setHeader("access-control-allow-origin", "*");
+        response.setHeader(
+          "access-control-allow-methods",
+          "GET,POST,DELETE,OPTIONS",
+        );
+        response.setHeader("access-control-allow-headers", "content-type");
+
+        if (request.method === "OPTIONS") {
+          response.statusCode = 204;
+          response.end();
+          return;
+        }
+
+        try {
+          await fs.mkdir(logDir, { recursive: true });
+
+          if (
+            request.method === "POST" &&
+            url.pathname === "/__ac_pdf_debug/log"
+          ) {
+            const body = await readRequestBody(request);
+            const parsed = JSON.parse(body);
+            const entries = Array.isArray(parsed) ? parsed : [parsed];
+            await fs.appendFile(
+              logFile,
+              `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+            );
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({ ok: true, count: entries.length }));
+            return;
+          }
+
+          if (
+            request.method === "DELETE" &&
+            url.pathname === "/__ac_pdf_debug/logs"
+          ) {
+            await fs.writeFile(logFile, "");
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify({ ok: true }));
+            return;
+          }
+
+          if (
+            request.method === "GET" &&
+            url.pathname === "/__ac_pdf_debug/logs"
+          ) {
+            const limit = Math.max(
+              0,
+              Math.floor(Number(url.searchParams.get("limit") ?? 200)),
+            );
+            const level = url.searchParams.get("level");
+            const eventName = url.searchParams.get("eventName");
+            const levelRank = PDF_PAGE_DEBUG_LEVELS.indexOf(level ?? "trace");
+            const content = await fs.readFile(logFile, "utf8").catch(() => "");
+            const entries =
+              limit === 0
+                ? []
+                : content
+                    .split("\n")
+                    .filter(Boolean)
+                    .map((line) => JSON.parse(line))
+                    .filter((entry) =>
+                      levelRank < 0
+                        ? true
+                        : PDF_PAGE_DEBUG_LEVELS.indexOf(entry.level) >=
+                          levelRank,
+                    )
+                    .filter((entry) =>
+                      eventName ? entry.eventName === eventName : true,
+                    )
+                    .slice(-limit)
+                    .reverse();
+
+            response.setHeader("content-type", "application/json");
+            response.end(JSON.stringify(entries));
+            return;
+          }
+
+          response.statusCode = 404;
+          response.end("Not found");
+        } catch (error) {
+          response.statusCode = 500;
+          response.setHeader("content-type", "application/json");
+          response.end(JSON.stringify({ ok: false, error: String(error) }));
+        }
+      });
+    },
+  };
+};
+
 export default defineConfig(({ mode }) => {
   // To load .env variables
   const envVars = loadEnv(mode, `../`);
@@ -125,6 +245,7 @@ export default defineConfig(({ mode }) => {
       assetsInlineLimit: 0,
     },
     plugins: [
+      createPdfPageDebugPlugin(),
       Sitemap({
         hostname: "https://excalidraw.com",
         outDir: "build",
