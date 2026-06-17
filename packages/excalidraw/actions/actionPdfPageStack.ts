@@ -49,7 +49,7 @@ const logPdfPageActionPredicate = (
     result: !!pageFrame,
     pageFrame,
     selectedElementIds: appState.selectedElementIds,
-  });
+  }, "debug");
 
   return !!pageFrame;
 };

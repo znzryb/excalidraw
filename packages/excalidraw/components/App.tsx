@@ -6078,7 +6078,7 @@ class App extends React.Component<AppProps, AppState> {
             pointer: { sceneX: x, sceneY: y },
             background: element,
             mappedFrame: hitElement,
-          });
+          }, "trace");
         }
 
         if (!hitElement || hitElementIds.has(hitElement.id)) {
@@ -8710,7 +8710,7 @@ class App extends React.Component<AppProps, AppState> {
             hitElementMightBeLocked,
             finalHitElement: pointerDownState.hit.element,
             selectedElementIds: this.state.selectedElementIds,
-          });
+          }, "debug");
         }
 
         this.hitLinkElement = this.getElementLinkAtPosition(
@@ -10245,7 +10245,7 @@ class App extends React.Component<AppProps, AppState> {
                 dragOffset,
                 snapOffset,
                 movedElementIds: Array.from(movedElementIds),
-              });
+              }, "debug");
             }
 
             dragSelectedElements(
@@ -12206,18 +12206,18 @@ class App extends React.Component<AppProps, AppState> {
         this.state,
       );
 
-      pdfPageDebug.log("importPdfFile:complete", {
-        docId,
-        pageCount: importedPageFrames.length,
+          pdfPageDebug.log("importPdfFile:complete", {
+            docId,
+            pageCount: importedPageFrames.length,
         pages: importedPageFrames.map((frame) => ({
           frame,
           background: pdfElements.find(
             (element) =>
               isPdfPageBackground(element) && element.frameId === frame.id,
           ),
-        })),
-        selectedElementIds,
-      });
+            })),
+            selectedElementIds,
+      }, "info");
 
       this.syncActionResult({
         elements: nextElements,
@@ -12535,7 +12535,7 @@ class App extends React.Component<AppProps, AppState> {
             element,
             selectedElementIds: this.state.selectedElementIds,
             itemNames: items.map((item: any) => item?.name).filter(Boolean),
-          });
+          }, "debug");
         }
 
         this.setState({

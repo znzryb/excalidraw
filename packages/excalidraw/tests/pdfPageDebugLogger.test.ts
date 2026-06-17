@@ -1,43 +1,109 @@
 import { newElement, newFrameElement } from "@excalidraw/element";
 import { vi } from "vitest";
 
+// @ts-expect-error fake-indexeddb v3 ships without TypeScript declarations.
+import FDBFactory from "fake-indexeddb/lib/FDBFactory";
+
 import {
-  PDF_PAGE_DEBUG_STORAGE_KEY,
+  PDF_PAGE_DEBUG_CONFIG_KEY,
   pdfPageDebug,
 } from "../pdfPageDebugLogger";
 import { PDF_PAGE_GAP, makePdfPageCustomData } from "../pdfPageStack";
 
+const resetIndexedDB = () => {
+  Object.defineProperty(window, "indexedDB", {
+    value: new FDBFactory(),
+    configurable: true,
+  });
+};
+
 describe("pdfPageDebug", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    resetIndexedDB();
     vi.restoreAllMocks();
+    await pdfPageDebug.clear();
   });
 
-  it("does not log while disabled", () => {
-    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+  it("does not persist logs while disabled", async () => {
+    await pdfPageDebug.log("disabled", { value: 1 }, "error");
 
-    pdfPageDebug.log("disabled", { value: 1 });
-    pdfPageDebug.group("disabled-group", { value: 1 });
-
-    expect(debug).not.toHaveBeenCalled();
-    expect(info).not.toHaveBeenCalled();
+    expect(await pdfPageDebug.dump()).toEqual([]);
   });
 
-  it("logs with a stable PDF debug prefix while enabled", () => {
-    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    localStorage.setItem(PDF_PAGE_DEBUG_STORAGE_KEY, "1");
+  it("persists logs after enable", async () => {
+    pdfPageDebug.enable();
 
-    pdfPageDebug.log("enabled", { value: 1 });
+    await pdfPageDebug.log("enabled", { value: 1 }, "debug");
+    const entries = await pdfPageDebug.dump();
 
-    expect(debug).toHaveBeenCalledWith("[PDF_PAGE_DEBUG]", "enabled", {
-      value: 1,
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      level: "debug",
+      eventName: "enabled",
+      payload: { value: 1 },
     });
+    expect(entries[0].id).toEqual(expect.any(String));
+    expect(entries[0].timestamp).toEqual(expect.any(Number));
+    expect(entries[0].sessionId).toEqual(expect.any(String));
   });
 
-  it("sanitizes elements before logging payloads", () => {
-    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
-    localStorage.setItem(PDF_PAGE_DEBUG_STORAGE_KEY, "1");
+  it("filters writes below the configured level", async () => {
+    pdfPageDebug.enable({ level: "warn" });
+
+    await pdfPageDebug.log("debug-event", { value: 1 }, "debug");
+    await pdfPageDebug.log("warn-event", { value: 2 }, "warn");
+    await pdfPageDebug.log("error-event", { value: 3 }, "error");
+
+    expect((await pdfPageDebug.dump()).map((entry) => entry.eventName)).toEqual([
+      "error-event",
+      "warn-event",
+    ]);
+  });
+
+  it("filters dumps by level and event name", async () => {
+    pdfPageDebug.enable({ level: "trace" });
+
+    await pdfPageDebug.log("mapped", { value: 1 }, "trace");
+    await pdfPageDebug.log("drag", { value: 2 }, "debug");
+    await pdfPageDebug.log("drag", { value: 3 }, "warn");
+
+    expect(
+      (await pdfPageDebug.dump({ level: "debug" })).map(
+        (entry) => entry.eventName,
+      ),
+    ).toEqual(["drag", "drag"]);
+    expect(
+      (await pdfPageDebug.dump({ eventName: "mapped" })).map(
+        (entry) => entry.level,
+      ),
+    ).toEqual(["trace"]);
+  });
+
+  it("clears persisted logs", async () => {
+    pdfPageDebug.enable();
+    await pdfPageDebug.log("entry", { value: 1 }, "debug");
+
+    await pdfPageDebug.clear();
+
+    expect(await pdfPageDebug.dump()).toEqual([]);
+  });
+
+  it("trims old logs over maxEntries", async () => {
+    pdfPageDebug.enable({ maxEntries: 2 });
+
+    await pdfPageDebug.log("one", null, "debug");
+    await pdfPageDebug.log("two", null, "debug");
+    await pdfPageDebug.log("three", null, "debug");
+
+    expect((await pdfPageDebug.dump()).map((entry) => entry.eventName)).toEqual([
+      "three",
+      "two",
+    ]);
+  });
+
+  it("sanitizes elements before persisting payloads", async () => {
+    pdfPageDebug.enable();
     const pdfPageFrame = newFrameElement({
       x: 0,
       y: 0,
@@ -58,9 +124,10 @@ describe("pdfPageDebug", () => {
       file: new Blob(["large"], { type: "text/plain" }),
     };
 
-    pdfPageDebug.log("sanitize", { element: note, frame: pdfPageFrame });
+    await pdfPageDebug.log("sanitize", { element: note, frame: pdfPageFrame });
+    const [entry] = await pdfPageDebug.dump();
 
-    expect(debug).toHaveBeenCalledWith("[PDF_PAGE_DEBUG]", "sanitize", {
+    expect(entry.payload).toEqual({
       element: expect.objectContaining({
         id: note.id,
         type: "rectangle",
@@ -79,7 +146,25 @@ describe("pdfPageDebug", () => {
         isPdfPageFrame: true,
       }),
     });
-    expect(debug.mock.calls[0][2]).not.toHaveProperty("element.points");
-    expect(debug.mock.calls[0][2]).not.toHaveProperty("element.file");
+    expect(entry.payload).not.toHaveProperty("element.points");
+    expect(entry.payload).not.toHaveProperty("element.file");
+  });
+
+  it("stores runtime config in localStorage", () => {
+    const config = pdfPageDebug.enable({
+      level: "trace",
+      console: true,
+      maxEntries: 5,
+    });
+
+    expect(config).toMatchObject({
+      enabled: true,
+      level: "trace",
+      console: true,
+      maxEntries: 5,
+    });
+    expect(
+      JSON.parse(localStorage.getItem(PDF_PAGE_DEBUG_CONFIG_KEY)!),
+    ).toMatchObject(config);
   });
 });
