@@ -10224,28 +10224,33 @@ class App extends React.Component<AppProps, AppState> {
               }
             }
 
-            if (
-              selectedElements.some(
-                (element) =>
-                  isPdfPageFrame(element) || isPdfPageBackground(element),
-              )
-            ) {
-              pdfPageDebug.log("pointerMove:dragSelectedElements", {
-                pointer: {
-                  sceneX: pointerDownState.lastCoords.x,
-                  sceneY: pointerDownState.lastCoords.y,
-                  clientX: event.clientX,
-                  clientY: event.clientY,
-                  button: event.button,
-                  eventType: event.type,
+            const hasSelectedPdfPageElement = selectedElements.some(
+              (element) =>
+                isPdfPageFrame(element) || isPdfPageBackground(element),
+            );
+
+            if (hasSelectedPdfPageElement) {
+              pdfPageDebug.log(
+                "pointerMove:pdfPageDragBlocked",
+                {
+                  pointer: {
+                    sceneX: pointerDownState.lastCoords.x,
+                    sceneY: pointerDownState.lastCoords.y,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    button: event.button,
+                    eventType: event.type,
+                  },
+                  hitElement: pointerDownState.hit.element,
+                  selectedElements,
+                  selectedElementIds: this.state.selectedElementIds,
+                  dragOffset,
+                  snapOffset,
+                  movedElementIds: Array.from(movedElementIds),
                 },
-                hitElement: pointerDownState.hit.element,
-                selectedElements,
-                selectedElementIds: this.state.selectedElementIds,
-                dragOffset,
-                snapOffset,
-                movedElementIds: Array.from(movedElementIds),
-              }, "debug");
+                "debug",
+              );
+              return;
             }
 
             dragSelectedElements(

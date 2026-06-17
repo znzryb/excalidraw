@@ -1,18 +1,29 @@
 import React from "react";
 import { vi } from "vitest";
 import { KEYS, reseed } from "@excalidraw/common";
-import { bindBindingElement } from "@excalidraw/element";
+import {
+  bindBindingElement,
+  newFrameElement,
+  newImageElement,
+} from "@excalidraw/element";
 import "@excalidraw/utils/test-utils";
 
 import type {
   ExcalidrawArrowElement,
+  FileId,
   NonDeleted,
 } from "@excalidraw/element/types";
 
 import { Excalidraw } from "../index";
+import {
+  PDF_PAGE_GAP,
+  makePdfPageBackgroundCustomData,
+  makePdfPageCustomData,
+} from "../pdfPageStack";
 import * as InteractiveCanvas from "../renderer/interactiveScene";
 import * as StaticScene from "../renderer/staticScene";
 
+import { API } from "./helpers/api";
 import { UI, Pointer, Keyboard } from "./helpers/ui";
 import { render, fireEvent, act, unmountComponent } from "./test-utils";
 
@@ -34,6 +45,46 @@ beforeEach(() => {
 const { h } = window;
 
 describe("move element", () => {
+  it("does not drag PDF page frames or backgrounds", async () => {
+    await render(<Excalidraw />);
+
+    const pageFrame = newFrameElement({
+      x: 100,
+      y: 80,
+      width: 200,
+      height: 120,
+      name: "PDF page 1",
+      customData: makePdfPageCustomData("pdf-move-test", 0, PDF_PAGE_GAP),
+    });
+    const pageBackground = newImageElement({
+      type: "image",
+      x: 100,
+      y: 80,
+      width: 200,
+      height: 120,
+      fileId: "pdf-page-background" as FileId,
+      status: "saved",
+      locked: true,
+      frameId: pageFrame.id,
+      customData: makePdfPageBackgroundCustomData("pdf-move-test", 0),
+    });
+
+    API.setElements([pageFrame, pageBackground]);
+    API.setSelectedElements([pageFrame]);
+
+    const mouse = new Pointer("mouse");
+    mouse.downAt(150, 110);
+    mouse.moveTo(240, 190);
+    mouse.upAt(240, 190);
+
+    expect(API.getElement(pageFrame)).toEqual(
+      expect.objectContaining({ x: 100, y: 80 }),
+    );
+    expect(API.getElement(pageBackground)).toEqual(
+      expect.objectContaining({ x: 100, y: 80 }),
+    );
+  });
+
   it("rectangle", async () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     const canvas = container.querySelector("canvas.interactive")!;
