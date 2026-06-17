@@ -398,6 +398,7 @@ import {
   isPdfPageFrame,
   PDF_MIME_TYPE,
 } from "../pdfPageStack";
+import { pdfPageDebug } from "../pdfPageDebugLogger";
 import {
   showHyperlinkTooltip,
   hideHyperlinkToolip,
@@ -6072,6 +6073,14 @@ class App extends React.Component<AppProps, AppState> {
           ? getPdfPageFrameForElement(element, elements)
           : element;
 
+        if (isPdfPageBackground(element)) {
+          pdfPageDebug.log("hitTest:pdfBackgroundMapped", {
+            pointer: { sceneX: x, sceneY: y },
+            background: element,
+            mappedFrame: hitElement,
+          });
+        }
+
         if (!hitElement || hitElementIds.has(hitElement.id)) {
           return;
         }
@@ -8643,6 +8652,10 @@ class App extends React.Component<AppProps, AppState> {
           },
         );
         const unlockedHitElements = allHitElements.filter((e) => !e.locked);
+        const hasPdfPageHit = allHitElements.some(
+          (element) =>
+            isPdfPageFrame(element) || isPdfPageBackground(element),
+        );
 
         // Cannot set preferSelected in getElementAtPosition as we do in pointer move; consider:
         // A & B: both unlocked, A selected, B on top, A & B overlaps in some way
@@ -8680,6 +8693,24 @@ class App extends React.Component<AppProps, AppState> {
               pointerDownState.origin.x,
               pointerDownState.origin.y,
             );
+        }
+
+        if (hasPdfPageHit) {
+          pdfPageDebug.log("pointerDown:hit", {
+            pointer: {
+              sceneX: pointerDownState.origin.x,
+              sceneY: pointerDownState.origin.y,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              button: event.button,
+              eventType: event.type,
+            },
+            allHitElements,
+            unlockedHitElements,
+            hitElementMightBeLocked,
+            finalHitElement: pointerDownState.hit.element,
+            selectedElementIds: this.state.selectedElementIds,
+          });
         }
 
         this.hitLinkElement = this.getElementLinkAtPosition(
@@ -10173,6 +10204,50 @@ class App extends React.Component<AppProps, AppState> {
           // when we're editing the name of a frame, we want the user to be
           // able to select and interact with the text input
           if (!this.state.editingFrame) {
+            const selectedFrameIds = new Set(
+              selectedElements
+                .filter((element) => isFrameLikeElement(element))
+                .map((element) => element.id),
+            );
+            const movedElementIds = new Set(
+              selectedElements.map((element) => element.id),
+            );
+
+            if (selectedFrameIds.size) {
+              for (const element of this.scene.getNonDeletedElements()) {
+                if (
+                  element.frameId &&
+                  selectedFrameIds.has(element.frameId)
+                ) {
+                  movedElementIds.add(element.id);
+                }
+              }
+            }
+
+            if (
+              selectedElements.some(
+                (element) =>
+                  isPdfPageFrame(element) || isPdfPageBackground(element),
+              )
+            ) {
+              pdfPageDebug.log("pointerMove:dragSelectedElements", {
+                pointer: {
+                  sceneX: pointerDownState.lastCoords.x,
+                  sceneY: pointerDownState.lastCoords.y,
+                  clientX: event.clientX,
+                  clientY: event.clientY,
+                  button: event.button,
+                  eventType: event.type,
+                },
+                hitElement: pointerDownState.hit.element,
+                selectedElements,
+                selectedElementIds: this.state.selectedElementIds,
+                dragOffset,
+                snapOffset,
+                movedElementIds: Array.from(movedElementIds),
+              });
+            }
+
             dragSelectedElements(
               pointerDownState,
               selectedElements,
@@ -12109,7 +12184,11 @@ class App extends React.Component<AppProps, AppState> {
           mimeTypes: [PDF_MIME_TYPE],
         }));
 
-      const { elements: pdfElements, files } = await renderPdfToPageStack(
+      const {
+        elements: pdfElements,
+        files,
+        docId,
+      } = await renderPdfToPageStack(
         file,
         sceneX ?? center.x,
         sceneY ?? center.y,
@@ -12120,18 +12199,32 @@ class App extends React.Component<AppProps, AppState> {
         ...pdfElements,
       ]);
       const importedPageFrames = pdfElements.filter(isPdfPageFrame);
+      const selectedElementIds = makeNextSelectedElementIds(
+        Object.fromEntries(
+          importedPageFrames.map((element) => [element.id, true]),
+        ),
+        this.state,
+      );
+
+      pdfPageDebug.log("importPdfFile:complete", {
+        docId,
+        pageCount: importedPageFrames.length,
+        pages: importedPageFrames.map((frame) => ({
+          frame,
+          background: pdfElements.find(
+            (element) =>
+              isPdfPageBackground(element) && element.frameId === frame.id,
+          ),
+        })),
+        selectedElementIds,
+      });
 
       this.syncActionResult({
         elements: nextElements,
         files: Object.fromEntries(files.map((file) => [file.id, file])),
         appState: {
           ...this.state,
-          selectedElementIds: makeNextSelectedElementIds(
-            Object.fromEntries(
-              importedPageFrames.map((element) => [element.id, true]),
-            ),
-            this.state,
-          ),
+          selectedElementIds,
         },
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       });
@@ -12390,6 +12483,8 @@ class App extends React.Component<AppProps, AppState> {
       );
 
     const type = element || isHittingCommonBoundBox ? "element" : "canvas";
+    const isPdfPageContextMenu =
+      !!element && (isPdfPageFrame(element) || isPdfPageBackground(element));
 
     const container = this.excalidrawContainerRef.current!;
     const { top: offsetTop, left: offsetLeft } =
@@ -12424,8 +12519,27 @@ class App extends React.Component<AppProps, AppState> {
         showHyperlinkPopup: false,
       },
       () => {
+        const items = this.getContextMenuItems(type);
+
+        if (isPdfPageContextMenu) {
+          pdfPageDebug.log("contextMenu:open", {
+            pointer: {
+              sceneX: x,
+              sceneY: y,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              button: event.button,
+              eventType: event.type,
+            },
+            type,
+            element,
+            selectedElementIds: this.state.selectedElementIds,
+            itemNames: items.map((item: any) => item?.name).filter(Boolean),
+          });
+        }
+
         this.setState({
-          contextMenu: { top, left, items: this.getContextMenuItems(type) },
+          contextMenu: { top, left, items },
         });
       },
     );

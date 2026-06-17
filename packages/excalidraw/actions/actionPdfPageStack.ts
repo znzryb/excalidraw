@@ -15,6 +15,7 @@ import {
   getPdfPageFrameForElement,
   insertPdfPageAfter,
 } from "../pdfPageStack";
+import { pdfPageDebug } from "../pdfPageDebugLogger";
 
 import { register } from "./register";
 
@@ -36,11 +37,22 @@ const getSelectedPdfPageFrame = (
   );
 };
 
-const isSinglePdfPageSelected = (
+const logPdfPageActionPredicate = (
+  actionName: string,
   elements: readonly ExcalidrawElement[],
   appState: AppState,
   app: AppClassProperties,
-) => !!getSelectedPdfPageFrame(elements, appState, app);
+) => {
+  const pageFrame = getSelectedPdfPageFrame(elements, appState, app);
+
+  pdfPageDebug.log(`actionPredicate:${actionName}`, {
+    result: !!pageFrame,
+    pageFrame,
+    selectedElementIds: appState.selectedElementIds,
+  });
+
+  return !!pageFrame;
+};
 
 const clearPdfPageSelection = (appState: AppState) => ({
   ...appState,
@@ -56,7 +68,7 @@ export const actionDeletePdfPage = register({
   label: "labels.deletePdfPage",
   trackEvent: { category: "element", action: "deletePdfPage" },
   predicate: (elements, appState, _, app) =>
-    isSinglePdfPageSelected(elements, appState, app),
+    logPdfPageActionPredicate("deletePdfPage", elements, appState, app),
   perform: (elements, appState, _, app) => {
     const pageFrame = getSelectedPdfPageFrame(elements, appState, app);
 
@@ -84,7 +96,7 @@ export const actionInsertPdfPageAfter = register({
   label: "labels.insertPdfPageAfter",
   trackEvent: { category: "element", action: "insertPdfPageAfter" },
   predicate: (elements, appState, _, app) =>
-    isSinglePdfPageSelected(elements, appState, app),
+    logPdfPageActionPredicate("insertPdfPageAfter", elements, appState, app),
   perform: async (elements, appState, _, app) => {
     const pageFrame = getSelectedPdfPageFrame(elements, appState, app);
     const pageData = getPdfPageData(pageFrame);
