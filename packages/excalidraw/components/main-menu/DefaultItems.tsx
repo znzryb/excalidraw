@@ -106,6 +106,23 @@ export const LoadScene = () => {
 };
 LoadScene.displayName = "LoadScene";
 
+export const ImportPDF = () => {
+  const { t } = useI18n();
+  const app = useApp();
+
+  return (
+    <DropdownMenuItem
+      icon={LoadIcon}
+      onSelect={() => app.importPdfFile()}
+      data-testid="import-pdf-button"
+      aria-label={t("buttons.importPDF")}
+    >
+      {t("buttons.importPDF")}
+    </DropdownMenuItem>
+  );
+};
+ImportPDF.displayName = "ImportPDF";
+
 export const SaveToActiveFile = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();

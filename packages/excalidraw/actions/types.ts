@@ -143,6 +143,8 @@ export type ActionName =
   | "linkToElement"
   | "cropEditor"
   | "wrapSelectionInFrame"
+  | "deletePdfPage"
+  | "insertPdfPageAfter"
   | "toggleLassoTool"
   | "toggleShapeSwitch"
   | "togglePolygon";

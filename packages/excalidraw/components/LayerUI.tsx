@@ -107,6 +107,7 @@ const DefaultMainMenu: React.FC<{
   return (
     <MainMenu __fallback>
       <MainMenu.DefaultItems.LoadScene />
+      <MainMenu.DefaultItems.ImportPDF />
       <MainMenu.DefaultItems.SaveToActiveFile />
       {/* FIXME we should to test for this inside the item itself */}
       {UIOptions.canvasActions.export && <MainMenu.DefaultItems.Export />}

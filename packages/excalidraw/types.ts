@@ -827,6 +827,7 @@ export type AppClassProperties = {
   lastViewportPosition: App["lastViewportPosition"];
   scrollToContent: App["scrollToContent"];
   addFiles: App["addFiles"];
+  importPdfFile: App["importPdfFile"];
   addElementsFromPasteOrLibrary: App["addElementsFromPasteOrLibrary"];
   togglePenMode: App["togglePenMode"];
   toggleLock: App["toggleLock"];

@@ -326,6 +326,8 @@ import {
   actionToggleArrowBinding,
   actionToggleMidpointSnapping,
   actionToggleCropEditor,
+  actionDeletePdfPage,
+  actionInsertPdfPageAfter,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
 import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
@@ -358,6 +360,7 @@ import {
 
 import { exportCanvas, loadFromBlob } from "../data";
 import Library, { distributeLibraryItemsOnSquareGrid } from "../data/library";
+import { renderPdfToPageStack } from "../data/pdf";
 import { restoreAppState, restoreElements } from "../data/restore";
 import { getCenter, getDistance } from "../gesture";
 import { History } from "../history";
@@ -388,6 +391,7 @@ import {
 } from "../data/blob";
 
 import { fileOpen } from "../data/filesystem";
+import { isPdfFile, PDF_MIME_TYPE } from "../pdfPageStack";
 import {
   showHyperlinkTooltip,
   hideHyperlinkToolip,
@@ -12047,6 +12051,72 @@ class App extends React.Component<AppProps, AppState> {
     });
   };
 
+  public importPdfFile = async (
+    pdfFile?: File,
+    sceneX?: number,
+    sceneY?: number,
+  ) => {
+    if (!this.isToolSupported("image")) {
+      this.setState({
+        isLoading: false,
+        errorMessage: t("errors.imageToolNotSupported"),
+      });
+      return;
+    }
+
+    try {
+      const clientX = this.state.width / 2 + this.state.offsetLeft;
+      const clientY = this.state.height / 2 + this.state.offsetTop;
+      const center = viewportCoordsToSceneCoords(
+        { clientX, clientY },
+        this.state,
+      );
+      const file =
+        pdfFile ||
+        (await fileOpen({
+          description: "PDF",
+          customExtensions: [".pdf"],
+          mimeTypes: [PDF_MIME_TYPE],
+        }));
+
+      const { elements: pdfElements, files } = await renderPdfToPageStack(
+        file,
+        sceneX ?? center.x,
+        sceneY ?? center.y,
+        this.props.generateIdForFile,
+      );
+      const nextElements = syncInvalidIndices([
+        ...this.scene.getElementsIncludingDeleted(),
+        ...pdfElements,
+      ]);
+
+      this.syncActionResult({
+        elements: nextElements,
+        files: Object.fromEntries(files.map((file) => [file.id, file])),
+        appState: {
+          ...this.state,
+          selectedElementIds: makeNextSelectedElementIds(
+            Object.fromEntries(
+              pdfElements.map((element) => [element.id, true]),
+            ),
+            this.state,
+          ),
+        },
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        console.warn(error);
+        return;
+      }
+      console.error(error);
+      this.setState({
+        isLoading: false,
+        errorMessage: error.message || "Failed to import PDF.",
+      });
+    }
+  };
+
   private handleAppOnDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     const { x: sceneX, y: sceneY } = viewportCoordsToSceneCoords(
       event,
@@ -12097,6 +12167,12 @@ class App extends React.Component<AppProps, AppState> {
     if (imageFiles.length > 0 && this.isToolSupported("image")) {
       return this.insertImages(imageFiles, sceneX, sceneY);
     }
+
+    const pdfFile = fileItems.map((data) => data.file).find(isPdfFile);
+    if (pdfFile && this.isToolSupported("image")) {
+      return this.importPdfFile(pdfFile, sceneX, sceneY);
+    }
+
     const excalidrawLibrary_ids = dataTransferList.getData(
       MIME_TYPES.excalidrawlibIds,
     );
@@ -12730,6 +12806,9 @@ class App extends React.Component<AppProps, AppState> {
       actionCut,
       actionCopy,
       actionPaste,
+      CONTEXT_MENU_SEPARATOR,
+      actionInsertPdfPageAfter,
+      actionDeletePdfPage,
       CONTEXT_MENU_SEPARATOR,
       actionSelectAllElementsInFrame,
       actionRemoveAllElementsFromFrame,

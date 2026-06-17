@@ -12,7 +12,9 @@ type FILE_EXTENSION = Exclude<keyof typeof MIME_TYPES, "binary">;
 
 export const fileOpen = async <M extends boolean | undefined = false>(opts: {
   extensions?: FILE_EXTENSION[];
+  customExtensions?: string[];
   description: string;
+  mimeTypes?: string[];
   multiple?: M;
 }): Promise<M extends false | undefined ? File : File[]> => {
   // an unsafe TS hack, alas not much we can do AFAIK
@@ -33,8 +35,8 @@ export const fileOpen = async <M extends boolean | undefined = false>(opts: {
 
   const files = await _fileOpen({
     description: opts.description,
-    extensions,
-    mimeTypes,
+    extensions: [...(extensions || []), ...(opts.customExtensions || [])],
+    mimeTypes: [...(mimeTypes || []), ...(opts.mimeTypes || [])],
     multiple: opts.multiple ?? false,
   });
 
