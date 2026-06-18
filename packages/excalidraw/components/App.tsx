@@ -5578,6 +5578,10 @@ class App extends React.Component<AppProps, AppState> {
         snapLines: prevState.snapLines.length ? [] : prevState.snapLines,
         originSnapOffset: null,
         activeEmbeddable: null,
+        activeToolPropertiesPanelHidden:
+          nextActiveTool.type === prevState.activeTool.type
+            ? prevState.activeToolPropertiesPanelHidden
+            : false,
         selectedLinearElement: isSelectionLikeTool(nextActiveTool.type)
           ? prevState.selectedLinearElement
           : null,

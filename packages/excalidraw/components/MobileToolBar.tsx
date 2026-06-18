@@ -243,6 +243,13 @@ export const MobileToolBar = ({
         title={`${capitalizeString(t("toolBar.freedraw"))}`}
         aria-label={capitalizeString(t("toolBar.freedraw"))}
         data-testid="toolbar-freedraw"
+        onCheckedPointerDown={() => {
+          setAppState((prevState) => ({
+            activeToolPropertiesPanelHidden:
+              !prevState.activeToolPropertiesPanelHidden,
+            openPopup: null,
+          }));
+        }}
         onChange={() => handleToolChange("freedraw")}
       />
 

@@ -6,8 +6,8 @@ import { Excalidraw } from "../index";
 
 import { getToolbarTools } from "../components/shapes";
 
-import { Pointer } from "./helpers/ui";
-import { act, render } from "./test-utils";
+import { Pointer, UI } from "./helpers/ui";
+import { act, fireEvent, render } from "./test-utils";
 
 import type { AppClassProperties, ExcalidrawImperativeAPI } from "../types";
 
@@ -57,6 +57,34 @@ describe("setActiveTool()", () => {
     mouse.up(20, 20);
 
     expect(h.state.activeTool.type).toBe("rectangle");
+  });
+
+  it("should toggle the active freedraw properties panel when clicking the selected freedraw tool", () => {
+    const queryShapeActions = () =>
+      document.querySelector(".selected-shape-actions");
+
+    expect(queryShapeActions()).toBeNull();
+
+    UI.clickTool("freedraw");
+    expect(h.state.activeTool.type).toBe("freedraw");
+    expect(h.state.activeToolPropertiesPanelHidden).toBe(false);
+    expect(queryShapeActions()).not.toBeNull();
+
+    const freedrawTool = document.querySelector(
+      '[data-testid="toolbar-freedraw"]',
+    )!;
+
+    fireEvent.pointerDown(freedrawTool, { pointerType: "mouse" });
+    expect(h.state.activeTool.type).toBe("freedraw");
+    expect(h.state.activeToolPropertiesPanelHidden).toBe(true);
+    expect(queryShapeActions()).toBeNull();
+
+    fireEvent.pointerDown(freedrawTool, { pointerType: "mouse" });
+    expect(h.state.activeToolPropertiesPanelHidden).toBe(false);
+    expect(queryShapeActions()).not.toBeNull();
+
+    UI.clickTool("rectangle");
+    expect(h.state.activeToolPropertiesPanelHidden).toBe(false);
   });
 
   it("should set custom tool", async () => {

@@ -12,7 +12,10 @@ import {
 
 import { mutateElement } from "@excalidraw/element";
 
-import { showSelectedShapeActions } from "@excalidraw/element";
+import {
+  getSelectedElements,
+  showSelectedShapeActions,
+} from "@excalidraw/element";
 
 import { ShapeCache } from "@excalidraw/element";
 
@@ -290,6 +293,12 @@ const LayerUI = ({
       appState,
       elements,
     );
+    const selectedElementsCount = getSelectedElements(
+      elements,
+      appState,
+    ).length;
+    const shouldHideActiveToolShapeActions =
+      appState.activeToolPropertiesPanelHidden && selectedElementsCount === 0;
 
     const shouldShowStats =
       appState.stats.open &&
@@ -311,7 +320,9 @@ const LayerUI = ({
                   isCompactStylesPanel,
               })}
             >
-              {shouldRenderSelectedShapeActions && renderSelectedShapeActions()}
+              {shouldRenderSelectedShapeActions &&
+                !shouldHideActiveToolShapeActions &&
+                renderSelectedShapeActions()}
             </div>
           </Stack.Col>
           {!appState.viewModeEnabled &&

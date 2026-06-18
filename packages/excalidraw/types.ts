@@ -279,6 +279,7 @@ export interface AppState {
   } | null;
   pdfPageMoveDocId: string | null;
   pdfPageMoveFrameId: string | null;
+  activeToolPropertiesPanelHidden: boolean;
   showWelcomeScreen: boolean;
   isLoading: boolean;
   errorMessage: React.ReactNode;

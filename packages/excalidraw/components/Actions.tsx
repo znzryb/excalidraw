@@ -1164,6 +1164,15 @@ export const ShapesSwitcher = ({
                   }
                 }
               }}
+              onCheckedPointerDown={() => {
+                if (value === "freedraw") {
+                  setAppState((prevState) => ({
+                    activeToolPropertiesPanelHidden:
+                      !prevState.activeToolPropertiesPanelHidden,
+                    openPopup: null,
+                  }));
+                }
+              }}
               onChange={({ pointerType }) => {
                 if (app.state.activeTool.type !== value) {
                   trackEvent("toolbar", value, "ui");
