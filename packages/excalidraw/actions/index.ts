@@ -95,4 +95,5 @@ export { actionToggleCropEditor } from "./actionCropEditor";
 export {
   actionDeletePdfPage,
   actionInsertPdfPageAfter,
+  actionMovePdfDocument,
 } from "./actionPdfPageStack";

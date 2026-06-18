@@ -277,6 +277,7 @@ export interface AppState {
     top: number;
     left: number;
   } | null;
+  pdfPageMoveDocId: string | null;
   showWelcomeScreen: boolean;
   isLoading: boolean;
   errorMessage: React.ReactNode;

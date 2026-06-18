@@ -250,6 +250,46 @@ const collectLaterPageElements = (
   return movedIds;
 };
 
+const collectPdfDocumentElements = (
+  elements: readonly ExcalidrawElement[],
+  docId: string,
+) => {
+  const movedIds = new Set<string>();
+  const pageFrames = getSortedPageFrames(elements, docId);
+
+  for (const frame of pageFrames) {
+    movedIds.add(frame.id);
+  }
+
+  for (const element of elements) {
+    if (element.isDeleted || movedIds.has(element.id)) {
+      continue;
+    }
+
+    const backgroundData = getPdfPageBackgroundData(element);
+    if (isPdfPageBackground(element) && backgroundData?.docId === docId) {
+      movedIds.add(element.id);
+      continue;
+    }
+
+    if (
+      !isPdfPageFrame(element) &&
+      !isPdfPageBackground(element) &&
+      pageFrames.some((frame) => intersectsFrame(element, frame, elements))
+    ) {
+      movedIds.add(element.id);
+    }
+  }
+
+  for (const element of elements) {
+    if (isElementBoundToChangedContainer(element, movedIds)) {
+      movedIds.add(element.id);
+    }
+  }
+
+  return movedIds;
+};
+
 const reindexPdfPages = (
   elements: readonly ExcalidrawElement[],
   docId: string,
@@ -398,6 +438,33 @@ export const insertPdfPageAfter = (
     .concat(insertedFrame, insertedBackground);
 
   return reindexPdfPages(nextElements, pageData.docId);
+};
+
+export const movePdfDocument = (
+  elements: readonly ExcalidrawElement[],
+  originalElements: readonly ExcalidrawElement[],
+  pageFrame: ExcalidrawFrameElement,
+  delta: { x: number; y: number },
+) => {
+  const pageData = getPdfPageData(pageFrame);
+  if (!pageData) {
+    return elements;
+  }
+
+  const movedIds = collectPdfDocumentElements(originalElements, pageData.docId);
+  const originalElementsMap = arrayToMap(originalElements);
+
+  return elements.map((element) => {
+    if (!movedIds.has(element.id)) {
+      return element;
+    }
+
+    const originalElement = originalElementsMap.get(element.id) ?? element;
+    return newElementWith(element, {
+      x: originalElement.x + delta.x,
+      y: originalElement.y + delta.y,
+    });
+  });
 };
 
 export const getBlankPdfPageFileName = (docId: string, pageIndex: number) =>

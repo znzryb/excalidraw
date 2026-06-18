@@ -166,6 +166,7 @@
     "sidebarLock": "Keep sidebar open",
     "selectAllElementsInFrame": "Select all elements in frame",
     "removeAllElementsFromFrame": "Remove all elements from frame",
+    "movePdfDocument": "Move whole PDF",
     "deletePdfPage": "Delete PDF page",
     "insertPdfPageAfter": "Insert blank page after",
     "eyeDropper": "Pick color from canvas",

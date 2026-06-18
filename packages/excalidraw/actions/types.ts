@@ -145,6 +145,7 @@ export type ActionName =
   | "wrapSelectionInFrame"
   | "deletePdfPage"
   | "insertPdfPageAfter"
+  | "movePdfDocument"
   | "toggleLassoTool"
   | "toggleShapeSwitch"
   | "togglePolygon";

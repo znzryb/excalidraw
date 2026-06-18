@@ -11,20 +11,21 @@ import {
   insertPdfPageAfter,
   makePdfPageBackgroundCustomData,
   makePdfPageCustomData,
+  movePdfDocument,
 } from "../pdfPageStack";
 
 import type { ExcalidrawElement, FileId } from "@excalidraw/element/types";
 
 const DOC_ID = "pdf-test";
 
-const createPage = (pageIndex: number, y: number) => {
+const createPage = (pageIndex: number, y: number, docId = DOC_ID) => {
   const frame = newFrameElement({
     x: 0,
     y,
     width: 100,
     height: 100,
     name: `PDF page ${pageIndex + 1}`,
-    customData: makePdfPageCustomData(DOC_ID, pageIndex, PDF_PAGE_GAP),
+    customData: makePdfPageCustomData(docId, pageIndex, PDF_PAGE_GAP),
   });
   const background = newImageElement({
     type: "image",
@@ -36,7 +37,7 @@ const createPage = (pageIndex: number, y: number) => {
     status: "saved",
     locked: true,
     frameId: frame.id,
-    customData: makePdfPageBackgroundCustomData(DOC_ID, pageIndex),
+    customData: makePdfPageBackgroundCustomData(docId, pageIndex),
   });
 
   return { frame, background };
@@ -155,5 +156,38 @@ describe("pdfPageStack", () => {
     expect(get(noteOnPage2.id).y).toBe(290);
     expect(getPdfPageData(get(insertedFrame.id))?.pageIndex).toBe(1);
     expect(getPdfPageData(get(page2.frame.id))?.pageIndex).toBe(2);
+  });
+
+  it("moves an entire PDF document and notes intersecting its pages", () => {
+    const page1 = createPage(0, 0);
+    const page2 = createPage(1, 140);
+    const otherPdfPage = createPage(0, 400, "other-pdf");
+    const noteOnPage2 = createNote(150);
+    const outsideNote = createNote(700);
+    const elements: ExcalidrawElement[] = [
+      page1.frame,
+      page1.background,
+      page2.frame,
+      page2.background,
+      noteOnPage2,
+      outsideNote,
+      otherPdfPage.frame,
+      otherPdfPage.background,
+    ];
+
+    const nextElements = movePdfDocument(elements, elements, page1.frame, {
+      x: 30,
+      y: 50,
+    });
+    const get = (id: string) => nextElements.find((el) => el.id === id)!;
+
+    expect(get(page1.frame.id)).toMatchObject({ x: 30, y: 50 });
+    expect(get(page1.background.id)).toMatchObject({ x: 30, y: 50 });
+    expect(get(page2.frame.id)).toMatchObject({ x: 30, y: 190 });
+    expect(get(page2.background.id)).toMatchObject({ x: 30, y: 190 });
+    expect(get(noteOnPage2.id)).toMatchObject({ x: 40, y: 200 });
+    expect(get(outsideNote.id)).toMatchObject({ x: 10, y: 700 });
+    expect(get(otherPdfPage.frame.id)).toMatchObject({ x: 0, y: 400 });
+    expect(get(otherPdfPage.background.id)).toMatchObject({ x: 0, y: 400 });
   });
 });

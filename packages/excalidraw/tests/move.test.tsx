@@ -43,31 +43,42 @@ beforeEach(() => {
 });
 
 const { h } = window;
+const PDF_MOVE_DOC_ID = "pdf-move-test";
+
+const createPdfPage = (pageIndex: number, y: number) => {
+  const pageFrame = newFrameElement({
+    x: 100,
+    y,
+    width: 200,
+    height: 120,
+    name: `PDF page ${pageIndex + 1}`,
+    customData: makePdfPageCustomData(
+      PDF_MOVE_DOC_ID,
+      pageIndex,
+      PDF_PAGE_GAP,
+    ),
+  });
+  const pageBackground = newImageElement({
+    type: "image",
+    x: 100,
+    y,
+    width: 200,
+    height: 120,
+    fileId: `pdf-page-background-${pageIndex}` as FileId,
+    status: "saved",
+    locked: true,
+    frameId: pageFrame.id,
+    customData: makePdfPageBackgroundCustomData(PDF_MOVE_DOC_ID, pageIndex),
+  });
+
+  return { pageFrame, pageBackground };
+};
 
 describe("move element", () => {
   it("does not drag PDF page frames or backgrounds", async () => {
     await render(<Excalidraw />);
 
-    const pageFrame = newFrameElement({
-      x: 100,
-      y: 80,
-      width: 200,
-      height: 120,
-      name: "PDF page 1",
-      customData: makePdfPageCustomData("pdf-move-test", 0, PDF_PAGE_GAP),
-    });
-    const pageBackground = newImageElement({
-      type: "image",
-      x: 100,
-      y: 80,
-      width: 200,
-      height: 120,
-      fileId: "pdf-page-background" as FileId,
-      status: "saved",
-      locked: true,
-      frameId: pageFrame.id,
-      customData: makePdfPageBackgroundCustomData("pdf-move-test", 0),
-    });
+    const { pageFrame, pageBackground } = createPdfPage(0, 80);
 
     API.setElements([pageFrame, pageBackground]);
     API.setSelectedElements([pageFrame]);
@@ -83,6 +94,63 @@ describe("move element", () => {
     expect(API.getElement(pageBackground)).toEqual(
       expect.objectContaining({ x: 100, y: 80 }),
     );
+  });
+
+  it("moves all pages from a PDF document when PDF document move mode is enabled", async () => {
+    await render(<Excalidraw />);
+
+    const page1 = createPdfPage(0, 80);
+    const page2 = createPdfPage(1, 240);
+    const noteOnPage2 = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 260,
+      width: 40,
+      height: 40,
+    });
+    const outsideNote = API.createElement({
+      type: "rectangle",
+      x: 120,
+      y: 500,
+      width: 40,
+      height: 40,
+    });
+
+    API.setElements([
+      page1.pageFrame,
+      page1.pageBackground,
+      page2.pageFrame,
+      page2.pageBackground,
+      noteOnPage2,
+      outsideNote,
+    ]);
+    API.setSelectedElements([page1.pageFrame]);
+    API.setAppState({ pdfPageMoveDocId: PDF_MOVE_DOC_ID });
+
+    const mouse = new Pointer("mouse");
+    mouse.downAt(150, 110);
+    mouse.moveTo(240, 190);
+    mouse.upAt(240, 190);
+
+    expect(API.getElement(page1.pageFrame)).toEqual(
+      expect.objectContaining({ x: 190, y: 160 }),
+    );
+    expect(API.getElement(page1.pageBackground)).toEqual(
+      expect.objectContaining({ x: 190, y: 160 }),
+    );
+    expect(API.getElement(page2.pageFrame)).toEqual(
+      expect.objectContaining({ x: 190, y: 320 }),
+    );
+    expect(API.getElement(page2.pageBackground)).toEqual(
+      expect.objectContaining({ x: 190, y: 320 }),
+    );
+    expect(API.getElement(noteOnPage2)).toEqual(
+      expect.objectContaining({ x: 210, y: 340 }),
+    );
+    expect(API.getElement(outsideNote)).toEqual(
+      expect.objectContaining({ x: 120, y: 500 }),
+    );
+    expect(h.state.pdfPageMoveDocId).toBeNull();
   });
 
   it("rectangle", async () => {

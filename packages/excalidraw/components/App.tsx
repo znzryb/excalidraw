@@ -328,6 +328,7 @@ import {
   actionToggleCropEditor,
   actionDeletePdfPage,
   actionInsertPdfPageAfter,
+  actionMovePdfDocument,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
 import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
@@ -396,6 +397,7 @@ import {
   isPdfFile,
   isPdfPageBackground,
   isPdfPageFrame,
+  movePdfDocument,
   PDF_MIME_TYPE,
 } from "../pdfPageStack";
 import { pdfPageDebug } from "../pdfPageDebugLogger";
@@ -10230,8 +10232,16 @@ class App extends React.Component<AppProps, AppState> {
             );
 
             if (hasSelectedPdfPageElement) {
+              const selectedPdfPageFrame =
+                selectedElements.find(isPdfPageFrame);
+              const canMovePdfDocument =
+                selectedPdfPageFrame?.customData?.pdfPage?.docId ===
+                this.state.pdfPageMoveDocId;
+
               pdfPageDebug.log(
-                "pointerMove:pdfPageDragBlocked",
+                canMovePdfDocument
+                  ? "pointerMove:pdfDocumentDrag"
+                  : "pointerMove:pdfPageDragBlocked",
                 {
                   pointer: {
                     sceneX: pointerDownState.lastCoords.x,
@@ -10250,6 +10260,25 @@ class App extends React.Component<AppProps, AppState> {
                 },
                 "debug",
               );
+
+              if (canMovePdfDocument) {
+                this.scene.replaceAllElements(
+                  movePdfDocument(
+                    this.scene.getElementsIncludingDeleted(),
+                    originalElements,
+                    selectedPdfPageFrame,
+                    {
+                      x: dragOffset.x + snapOffset.x,
+                      y: dragOffset.y + snapOffset.y,
+                    },
+                  ),
+                );
+                this.setState({
+                  selectedElementsAreBeingDragged: true,
+                  selectionElement: null,
+                });
+              }
+
               return;
             }
 
@@ -10789,6 +10818,7 @@ class App extends React.Component<AppProps, AppState> {
       this.setState({
         selectedElementsAreBeingDragged: false,
         bindMode: "orbit",
+        pdfPageMoveDocId: null,
       });
 
       if (
@@ -12957,6 +12987,7 @@ class App extends React.Component<AppProps, AppState> {
       actionCopy,
       actionPaste,
       CONTEXT_MENU_SEPARATOR,
+      actionMovePdfDocument,
       actionInsertPdfPageAfter,
       actionDeletePdfPage,
       CONTEXT_MENU_SEPARATOR,

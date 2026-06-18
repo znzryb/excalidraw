@@ -151,3 +151,32 @@ export const actionInsertPdfPageAfter = register({
     };
   },
 });
+
+export const actionMovePdfDocument = register({
+  name: "movePdfDocument",
+  label: "labels.movePdfDocument",
+  trackEvent: { category: "element", action: "movePdfDocument" },
+  predicate: (elements, appState, _, app) =>
+    logPdfPageActionPredicate("movePdfDocument", elements, appState, app),
+  perform: (elements, appState, _, app) => {
+    const pageFrame = getSelectedPdfPageFrame(elements, appState, app);
+    const pageData = getPdfPageData(pageFrame);
+
+    if (!pageFrame || !pageData) {
+      return false;
+    }
+
+    return {
+      appState: {
+        ...appState,
+        selectedElementIds: { [pageFrame.id]: true },
+        selectedGroupIds: {},
+        selectedLinearElement: null,
+        activeEmbeddable: null,
+        contextMenu: null,
+        pdfPageMoveDocId: pageData.docId,
+      },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    };
+  },
+});
