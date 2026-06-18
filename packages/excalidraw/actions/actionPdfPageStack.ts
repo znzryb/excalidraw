@@ -175,6 +175,7 @@ export const actionMovePdfDocument = register({
         activeEmbeddable: null,
         contextMenu: null,
         pdfPageMoveDocId: pageData.docId,
+        pdfPageMoveFrameId: pageFrame.id,
       },
       captureUpdate: CaptureUpdateAction.NEVER,
     };

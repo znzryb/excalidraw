@@ -125,7 +125,10 @@ describe("move element", () => {
       outsideNote,
     ]);
     API.setSelectedElements([page1.pageFrame]);
-    API.setAppState({ pdfPageMoveDocId: PDF_MOVE_DOC_ID });
+    API.setAppState({
+      pdfPageMoveDocId: PDF_MOVE_DOC_ID,
+      pdfPageMoveFrameId: page1.pageFrame.id,
+    });
 
     const mouse = new Pointer("mouse");
     mouse.downAt(150, 110);
@@ -150,7 +153,24 @@ describe("move element", () => {
     expect(API.getElement(outsideNote)).toEqual(
       expect.objectContaining({ x: 120, y: 500 }),
     );
+    expect(h.state.pdfPageMoveDocId).toBe(PDF_MOVE_DOC_ID);
+    expect(h.state.pdfPageMoveFrameId).toBe(page1.pageFrame.id);
+
+    mouse.downAt(200, 170);
+    mouse.moveTo(180, 140);
+    mouse.upAt(180, 140);
+
+    expect(API.getElement(page1.pageFrame)).toEqual(
+      expect.objectContaining({ x: 170, y: 130 }),
+    );
+    expect(API.getElement(page2.pageFrame)).toEqual(
+      expect.objectContaining({ x: 170, y: 290 }),
+    );
+
+    mouse.clickAt(10, 10);
+
     expect(h.state.pdfPageMoveDocId).toBeNull();
+    expect(h.state.pdfPageMoveFrameId).toBeNull();
   });
 
   it("rectangle", async () => {

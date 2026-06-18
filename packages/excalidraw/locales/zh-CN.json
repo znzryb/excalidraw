@@ -155,7 +155,7 @@
     "sidebarLock": "侧边栏常驻",
     "selectAllElementsInFrame": "选择画框中的所有元素",
     "removeAllElementsFromFrame": "分离出画框中的所有元素",
-    "movePdfDocument": "移动整个 PDF",
+    "movePdfDocument": "允许移动整个 PDF 组页面",
     "deletePdfPage": "删除 PDF 页面",
     "insertPdfPageAfter": "在后面插入空白页",
     "eyeDropper": "从画布上取色",

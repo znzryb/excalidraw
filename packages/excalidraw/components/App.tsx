@@ -10236,7 +10236,8 @@ class App extends React.Component<AppProps, AppState> {
                 selectedElements.find(isPdfPageFrame);
               const canMovePdfDocument =
                 selectedPdfPageFrame?.customData?.pdfPage?.docId ===
-                this.state.pdfPageMoveDocId;
+                  this.state.pdfPageMoveDocId &&
+                selectedPdfPageFrame.id === this.state.pdfPageMoveFrameId;
 
               pdfPageDebug.log(
                 canMovePdfDocument
@@ -10818,7 +10819,6 @@ class App extends React.Component<AppProps, AppState> {
       this.setState({
         selectedElementsAreBeingDragged: false,
         bindMode: "orbit",
-        pdfPageMoveDocId: null,
       });
 
       if (
@@ -11598,6 +11598,8 @@ class App extends React.Component<AppProps, AppState> {
             selectedGroupIds: {},
             editingGroupId: null,
             activeEmbeddable: null,
+            pdfPageMoveDocId: null,
+            pdfPageMoveFrameId: null,
           });
         }
         // reset cursor
@@ -11647,8 +11649,24 @@ class App extends React.Component<AppProps, AppState> {
             isEmbeddableElement(newElement) && !newElement.link
               ? "editor"
               : prevState.showHyperlinkPopup,
-        }));
+          }));
       }
+
+      this.setState((prevState) => {
+        const pdfPageMoveFrameId = prevState.pdfPageMoveFrameId;
+
+        if (
+          pdfPageMoveFrameId &&
+          !prevState.selectedElementIds[pdfPageMoveFrameId]
+        ) {
+          return {
+            pdfPageMoveDocId: null,
+            pdfPageMoveFrameId: null,
+          };
+        }
+
+        return null;
+      });
 
       if (
         activeTool.type !== "selection" ||
