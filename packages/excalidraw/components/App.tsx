@@ -8266,7 +8266,12 @@ class App extends React.Component<AppProps, AppState> {
           (event.button === POINTER_BUTTON.MAIN && isHoldingSpace) ||
           isHandToolActive(this.state) ||
           (this.state.viewModeEnabled &&
-            this.state.activeTool.type !== "laser"))
+            this.state.activeTool.type !== "laser") ||
+          // AC-ladder: pen mode + freedraw 时单指 touch 平移画布，让
+          // Apple Pencil 画笔之余手指也能直接拖动而不必双指。
+          (this.state.penMode &&
+            event.pointerType === "touch" &&
+            this.state.activeTool.type === "freedraw"))
       )
     ) {
       return false;
