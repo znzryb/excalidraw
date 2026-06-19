@@ -1684,7 +1684,15 @@ const _renderInteractiveScene = ({
     };
   }
 
-  if (appState.frameToHighlight) {
+  // AC-ladder patch: suppress the blue frame outline while the freedraw tool
+  // is active. PDF pages are hosted in frames as background scaffolding, so
+  // the "frame is active" hover visual is just noise to a user who is drawing
+  // notes on top — and it can read as "the frame is selected." We only gate
+  // the visual; `appState.frameToHighlight` is still set/cleared by the
+  // pointer handlers, so stroke clipping (staticScene / renderNewElementScene)
+  // and stroke→frame assignment (getTopLayerFrameAtSceneCoords at pointerup)
+  // are untouched.
+  if (appState.frameToHighlight && appState.activeTool.type !== "freedraw") {
     renderFrameHighlight(
       context,
       appState,
