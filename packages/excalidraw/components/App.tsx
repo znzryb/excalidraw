@@ -631,6 +631,51 @@ const gesture: Gesture = {
   initialScale: null,
 };
 
+// AC-ladder debug hook (see /Users/.../AC-ladder/.claude/plans/ipad-0-47-abstract-floyd.md):
+// host page may install window.__acPointerLog to capture pointer-level events
+// for diagnosing iPad pen freezes. Throttled to 100ms per pointerId for
+// move events; down/up/cancel always emit.
+const __acPointerLastMoveEmit = new Map<number, number>();
+const __AC_POINTER_MOVE_THROTTLE_MS = 100;
+const __emitAcPointer = (
+  event: React.PointerEvent<HTMLElement> | PointerEvent,
+  phase: "down" | "move" | "up" | "cancel" | "leave" | "out",
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const sink = (window as unknown as {
+    __acPointerLog?: (payload: Record<string, unknown>) => void;
+  }).__acPointerLog;
+  if (!sink) {
+    return;
+  }
+  if (phase === "move") {
+    const now = performance.now();
+    const last = __acPointerLastMoveEmit.get(event.pointerId) ?? 0;
+    if (now - last < __AC_POINTER_MOVE_THROTTLE_MS) {
+      return;
+    }
+    __acPointerLastMoveEmit.set(event.pointerId, now);
+  } else {
+    __acPointerLastMoveEmit.delete(event.pointerId);
+  }
+  try {
+    sink({
+      phase,
+      pointerType: event.pointerType,
+      pointerId: event.pointerId,
+      isPrimary: event.isPrimary,
+      button: event.button,
+      pressure: Number((event.pressure ?? 0).toFixed(3)),
+      x: Math.round(event.clientX),
+      y: Math.round(event.clientY),
+    });
+  } catch {
+    // never break drawing for instrumentation
+  }
+};
+
 class App extends React.Component<AppProps, AppState> {
   canvas: AppClassProperties["canvas"];
   interactiveCanvas: AppClassProperties["interactiveCanvas"] = null;
@@ -4259,6 +4304,17 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   removePointer = (event: React.PointerEvent<HTMLElement> | PointerEvent) => {
+    const evType = (event as { type?: string }).type;
+    if (evType === "pointercancel") {
+      __emitAcPointer(event, "cancel");
+    } else if (evType === "pointerleave") {
+      __emitAcPointer(event, "leave");
+    } else if (evType === "pointerout") {
+      __emitAcPointer(event, "out");
+    } else {
+      __emitAcPointer(event, "up");
+    }
+
     if (touchTimeout) {
       this.resetContextMenuTimer();
     }
@@ -6930,6 +6986,7 @@ class App extends React.Component<AppProps, AppState> {
   private handleCanvasPointerMove = (
     event: React.PointerEvent<HTMLCanvasElement>,
   ) => {
+    __emitAcPointer(event, "move");
     this.savePointer(event.clientX, event.clientY, this.state.cursorButton);
     this.lastPointerMoveEvent = event.nativeEvent;
     const scenePointer = viewportCoordsToSceneCoords(event, this.state);
@@ -7695,6 +7752,7 @@ class App extends React.Component<AppProps, AppState> {
   private handleCanvasPointerDown = (
     event: React.PointerEvent<HTMLElement>,
   ) => {
+    __emitAcPointer(event, "down");
     const selectedElements = this.scene.getSelectedElements(this.state);
 
     // If Ctrl is not held, ensure isBindingEnabled reflects the user preference.
