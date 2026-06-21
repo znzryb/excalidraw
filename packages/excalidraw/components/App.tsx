@@ -8325,12 +8325,13 @@ class App extends React.Component<AppProps, AppState> {
           isHandToolActive(this.state) ||
           (this.state.viewModeEnabled &&
             this.state.activeTool.type !== "laser") ||
-          // AC-ladder: pen mode + freedraw 时单指 touch 平移画布，让
-          // Apple Pencil 画笔之余手指也能直接拖动而不必双指。
+          // AC-ladder: pen mode 下 freedraw / eraser 时单指 touch 平移画布，
+          // 让 Apple Pencil 作画 / 擦除之余手指也能直接拖动而不必双指。
           (this.state.penMode &&
             "pointerType" in event &&
             event.pointerType === "touch" &&
-            this.state.activeTool.type === "freedraw"))
+            (this.state.activeTool.type === "freedraw" ||
+              this.state.activeTool.type === "eraser")))
       )
     ) {
       return false;
